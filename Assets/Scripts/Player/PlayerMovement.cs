@@ -10,7 +10,7 @@ public class PlayerMovement : MonoBehaviour
     public float gravity = -9.81f;
 
     private CharacterController controller;
-    private PlayerInputActions inputActions;
+    private InputSystem_Actions inputActions;
 
     private Vector2 moveInput;
     private Vector3 velocity;
@@ -19,7 +19,7 @@ public class PlayerMovement : MonoBehaviour
     void Awake()
     {
         controller = GetComponent<CharacterController>();
-        inputActions = new PlayerInputActions();
+        inputActions = new InputSystem_Actions();
     }
 
     void OnEnable()
