@@ -10,6 +10,10 @@ namespace Blocks.Sessions.Common
 {
     public class PlayGameViewModel : IDisposable, INotifyBindablePropertyChanged
     {
+        const string k_GameplayScenePath = "Scenes/Test Scenes/Gameplay";
+
+        public static event Action GameplayStartRequested;
+
         private SessionObserver m_SessionObserver;
         private ISession m_Session;
 
@@ -52,26 +56,40 @@ namespace Blocks.Sessions.Common
         {
             UnityEngine.Debug.Log("[PlayGameViewModel] OnSessionAdded called");
             m_Session = newSession;
+            m_Session.SessionHostChanged += OnSessionHostChanged;
+            m_Session.RemovedFromSession += OnSessionRemoved;
+            m_Session.Deleted += OnSessionRemoved;
             m_Session.PlayerJoined += OnPlayerJoined;
-            m_Session.PlayerLeaving += OnPlayerLeaving;
+            m_Session.PlayerHasLeft += OnPlayerLeaving;
             UpdateCanPlayGame();
         }
 
-        void OnPlayerJoined(IPlayer player)
+        void OnSessionHostChanged(string hostPlayerId)
         {
-            UnityEngine.Debug.Log($"[PlayGameViewModel] Player joined: {player.Id}");
+            UnityEngine.Debug.Log($"[PlayGameViewModel] Session host changed: {hostPlayerId}");
             UpdateCanPlayGame();
         }
 
-        void OnPlayerLeaving(IPlayer player)
+        void OnPlayerJoined(string playerId)
         {
-            UnityEngine.Debug.Log($"[PlayGameViewModel] Player leaving: {player.Id}");
+            UnityEngine.Debug.Log($"[PlayGameViewModel] Player joined: {playerId}");
+            UpdateCanPlayGame();
+        }
+
+        void OnPlayerLeaving(string playerId)
+        {
+            UnityEngine.Debug.Log($"[PlayGameViewModel] Player leaving: {playerId}");
+            UpdateCanPlayGame();
+        }
+
+        void OnSessionRemoved()
+        {
+            CleanupSession();
             UpdateCanPlayGame();
         }
 
         void UpdateCanPlayGame()
         {
-            // Can play if we have a session with at least 2 players connected
             if (m_Session == null)
             {
                 CanPlayGame = false;
@@ -79,8 +97,11 @@ namespace Blocks.Sessions.Common
             }
 
             int playerCount = m_Session.Players.Count;
-            UnityEngine.Debug.Log($"[PlayGameViewModel] Player count: {playerCount}");
-            CanPlayGame = playerCount >= 2;
+            bool isHost = m_Session.IsHost;
+            UnityEngine.Debug.Log($"[PlayGameViewModel] Player count: {playerCount}, IsHost: {isHost}");
+
+            // Only the session host should be able to trigger a synchronized scene transition.
+            CanPlayGame = playerCount >= 2 && isHost;
         }
 
         public void PlayGame()
@@ -93,9 +114,30 @@ namespace Blocks.Sessions.Common
                 return;
             }
 
-            UnityEngine.Debug.Log("[PlayGameViewModel] Loading Gameplay scene...");
-            // Load the Gameplay scene
-            SceneManager.LoadScene("Scenes/Test Scenes/Gameplay", LoadSceneMode.Single);
+            if (GameplayStartRequested != null)
+            {
+                UnityEngine.Debug.Log("[PlayGameViewModel] Requesting synchronized gameplay start...");
+                GameplayStartRequested.Invoke();
+                return;
+            }
+
+            UnityEngine.Debug.LogWarning("[PlayGameViewModel] No network scene loader is active. Falling back to a local scene load.");
+            SceneManager.LoadScene(k_GameplayScenePath, LoadSceneMode.Single);
+        }
+
+        void CleanupSession()
+        {
+            if (m_Session == null)
+            {
+                return;
+            }
+
+            m_Session.SessionHostChanged -= OnSessionHostChanged;
+            m_Session.RemovedFromSession -= OnSessionRemoved;
+            m_Session.Deleted -= OnSessionRemoved;
+            m_Session.PlayerJoined -= OnPlayerJoined;
+            m_Session.PlayerHasLeft -= OnPlayerLeaving;
+            m_Session = null;
         }
 
         public void Dispose()
@@ -108,9 +150,7 @@ namespace Blocks.Sessions.Common
 
             if (m_Session != null)
             {
-                m_Session.PlayerJoined -= OnPlayerJoined;
-                m_Session.PlayerLeaving -= OnPlayerLeaving;
-                m_Session = null;
+                CleanupSession();
             }
         }
 

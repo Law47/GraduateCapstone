@@ -30,21 +30,27 @@ public class GameSpawnManager : MonoBehaviour
         SpawnAllPlayersAtRandomLocations();
     }
 
+    public Vector3 GetRandomSpawnPosition()
+    {
+        if (spawnPoints == null || spawnPoints.Length == 0)
+            return transform.position;
+
+        var spawnPointIndex = Random.Range(0, spawnPoints.Length);
+        return spawnPoints[spawnPointIndex].position;
+    }
+
     private void SpawnAllPlayersAtRandomLocations()
     {
         var connectedClients = NetworkManager.Singleton.ConnectedClients;
         var availableSpawnPoints = new List<int>();
-        
-        // Initialize list with all spawn point indices
+
         for (int i = 0; i < spawnPoints.Length; i++)
         {
             availableSpawnPoints.Add(i);
         }
 
-        int clientIndex = 0;
         foreach (var client in connectedClients.Values)
         {
-            // If we've used all spawn points, start reusing them
             if (availableSpawnPoints.Count == 0)
             {
                 for (int i = 0; i < spawnPoints.Length; i++)
@@ -53,7 +59,6 @@ public class GameSpawnManager : MonoBehaviour
                 }
             }
 
-            // Pick a random spawn point from available ones
             int randomIndex = Random.Range(0, availableSpawnPoints.Count);
             int spawnPointIndex = availableSpawnPoints[randomIndex];
             availableSpawnPoints.RemoveAt(randomIndex);
@@ -63,8 +68,6 @@ public class GameSpawnManager : MonoBehaviour
             
             var networkObject = playerInstance.GetComponent<NetworkObject>();
             networkObject.SpawnAsPlayerObject(client.ClientId);
-            
-            clientIndex++;
         }
     }
 }

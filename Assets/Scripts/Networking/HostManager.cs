@@ -13,7 +13,5 @@ public class HostManager : MonoBehaviour
         transport.SetConnectionData("0.0.0.0", port);
 
         NetworkManager.Singleton.StartHost();
-
-        Debug.Log("Hosting on port " + port);
     }
 }
