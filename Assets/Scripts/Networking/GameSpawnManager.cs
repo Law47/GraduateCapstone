@@ -30,6 +30,15 @@ public class GameSpawnManager : MonoBehaviour
         SpawnAllPlayersAtRandomLocations();
     }
 
+    public GameObject SpawnSingleplayerPlayer()
+    {
+        if (playerPrefab == null)
+            return null;
+
+        var spawnPosition = GetRandomSpawnPosition();
+        return Instantiate(playerPrefab, spawnPosition, Quaternion.identity);
+    }
+
     public Vector3 GetRandomSpawnPosition()
     {
         if (spawnPoints == null || spawnPoints.Length == 0)
