@@ -668,7 +668,7 @@ MonoBehaviour:
   - {fileID: 1575682589}
   - {fileID: 344400926}
   - {fileID: 1895320187}
-  playerPrefab: {fileID: 0}
+  playerPrefab: {fileID: 2516021150234599420, guid: b9efae10ce1c9f04a8cb248352532222, type: 3}
 --- !u!1 &930557426
 GameObject:
   m_ObjectHideFlags: 0
