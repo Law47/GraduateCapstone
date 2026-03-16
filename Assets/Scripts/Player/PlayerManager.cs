@@ -5,6 +5,7 @@ public class PlayerManager : NetworkBehaviour
 {
     [Header("Health")]
     [SerializeField] private int maxHealth = 100;
+    [SerializeField] private int currentHealth;
 
     private readonly NetworkVariable<int> m_CurrentHealth = new(
         100,
@@ -25,10 +26,20 @@ public class PlayerManager : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
+        m_CurrentHealth.OnValueChanged += OnCurrentHealthChanged;
+
         if (IsServer)
         {
             m_CurrentHealth.Value = maxHealth;
         }
+
+        currentHealth = m_CurrentHealth.Value;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        m_CurrentHealth.OnValueChanged -= OnCurrentHealthChanged;
+        base.OnNetworkDespawn();
     }
 
     public void ApplyDamage(int damage)
@@ -65,6 +76,11 @@ public class PlayerManager : NetworkBehaviour
         {
             Die();
         }
+    }
+
+    private void OnCurrentHealthChanged(int previousValue, int newValue)
+    {
+        currentHealth = newValue;
     }
 
     private void Die()
