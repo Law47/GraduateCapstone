@@ -51,6 +51,26 @@ public class GameSpawnManager : MonoBehaviour
     private void SpawnAllPlayersAtRandomLocations()
     {
         var connectedClients = NetworkManager.Singleton.ConnectedClients;
+
+        if (spawnPoints == null || spawnPoints.Length == 0)
+        {
+            Debug.LogWarning("Warning: no spawnpoints configured. Spawning players at GameSpawnManager position.");
+
+            foreach (var client in connectedClients.Values)
+            {
+                var fallbackInstance = Instantiate(playerPrefab, transform.position, Quaternion.identity);
+                var fallbackNetworkObject = fallbackInstance.GetComponent<NetworkObject>();
+                fallbackNetworkObject.SpawnAsPlayerObject(client.ClientId);
+            }
+
+            return;
+        }
+
+        if (connectedClients.Count > spawnPoints.Length)
+        {
+            Debug.LogWarning("Warning: more players than spawnpoints");
+        }
+
         var availableSpawnPoints = new List<int>();
 
         for (int i = 0; i < spawnPoints.Length; i++)
