@@ -26,6 +26,8 @@ public class MainMenuCreateSessionController : MonoBehaviour
     private LobbyRelayManager m_LobbyRelayManager;
     private bool m_IsCreating;
 
+    public ISession CurrentSession => m_Session;
+
     private void Awake()
     {
         m_SessionNameInput = GetComponentInChildren<TMP_InputField>(true);
@@ -143,6 +145,12 @@ public class MainMenuCreateSessionController : MonoBehaviour
         m_Session.RemovedFromSession -= OnSessionRemoved;
         m_Session.Deleted -= OnSessionRemoved;
         m_Session = null;
+    }
+
+    public void ClearLobbySessionState()
+    {
+        CleanupSession();
+        RefreshLobbyUi();
     }
 
     private void RefreshLobbyUi()

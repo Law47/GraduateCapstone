@@ -15,6 +15,8 @@ public class LobbyRelayManager : MonoBehaviour
     private string currentLobbyCode = "";
     private string statusMessage = "";
     private string hostIp = "";
+    private bool m_IsClientLobbyConnection;
+    private bool m_HandlingClientDisconnect;
 
     public string CurrentLobbyCode => currentLobbyCode;
     public string StatusMessage => statusMessage;
@@ -23,11 +25,21 @@ public class LobbyRelayManager : MonoBehaviour
     private void OnEnable()
     {
         PlayGameViewModel.GameplayStartRequested += OnGameplayStartRequested;
+
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
+        }
     }
 
     private void OnDisable()
     {
         PlayGameViewModel.GameplayStartRequested -= OnGameplayStartRequested;
+
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnect;
+        }
     }
 
     public void SetHostIp(string ip)
@@ -161,16 +173,74 @@ public class LobbyRelayManager : MonoBehaviour
             if (!started)
             {
                 statusMessage = "Failed to connect to host.";
+                m_IsClientLobbyConnection = false;
                 return;
             }
 
+            m_IsClientLobbyConnection = true;
             currentLobbyCode = lobbyCode;
             statusMessage = $"Connected to {hostIp}:{port}";
         }
         catch (System.Exception)
         {
+            m_IsClientLobbyConnection = false;
             statusMessage = "Client error.";
         }
+    }
+
+    public void StopLobbyHost()
+    {
+        m_IsClientLobbyConnection = false;
+        ShutdownNetworkAndReset("Lobby disbanded.");
+    }
+
+    public void StopLobbyClient()
+    {
+        m_IsClientLobbyConnection = false;
+        ShutdownNetworkAndReset("Left lobby.");
+    }
+
+    private void OnClientDisconnect(ulong clientId)
+    {
+        var networkManager = NetworkManager.Singleton;
+        if (networkManager == null)
+            return;
+
+        if (clientId != networkManager.LocalClientId)
+            return;
+
+        if (!m_IsClientLobbyConnection || m_HandlingClientDisconnect)
+            return;
+
+        if (networkManager.IsHost || networkManager.IsServer)
+            return;
+
+        m_HandlingClientDisconnect = true;
+        statusMessage = "Host ended lobby.";
+
+        var leaveButton = UnityEngine.Object.FindFirstObjectByType<MainMenuClientLeaveLobbyButton>();
+        if (leaveButton != null)
+        {
+            leaveButton.SimulateLeaveButtonClick();
+        }
+        else
+        {
+            StopLobbyClient();
+        }
+
+        m_HandlingClientDisconnect = false;
+    }
+
+    private void ShutdownNetworkAndReset(string message)
+    {
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            NetworkManager.Singleton.Shutdown();
+        }
+
+        currentLobbyCode = string.Empty;
+        hostIp = string.Empty;
+        statusMessage = message;
     }
 
     private string GenerateLobbyCode()
