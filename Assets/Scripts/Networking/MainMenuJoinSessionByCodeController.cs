@@ -58,6 +58,8 @@ public class MainMenuJoinSessionByCodeController : MonoBehaviour
                 m_JoinByCodeButton.interactable = false;
 
             await MultiplayerServiceBootstrap.EnsureInitializedAndSignedInAsync();
+            await SessionLifecycleUtility.CleanupActiveSessionsAsync();
+            ClearLobbySessionState();
 
             var joinedSession = await MultiplayerService.Instance.JoinSessionByCodeAsync(code, new JoinSessionOptions
             {
@@ -73,9 +75,9 @@ public class MainMenuJoinSessionByCodeController : MonoBehaviour
             m_LobbyRelayManager.SetCurrentLobbyCode(code);
             m_LobbyRelayManager.StartClientWithLobby(hostIpForDirectConnect, code);
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            // Invalid or non-existent code — do nothing.
+            Debug.LogException(exception);
         }
         finally
         {

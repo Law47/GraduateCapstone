@@ -24,7 +24,9 @@ public class MainMenuHostDisbandLobbyButton : MonoBehaviour
 
             EnsureReferences();
 
-            var session = hostSessionController != null ? hostSessionController.CurrentSession : null;
+            var session = hostSessionController != null
+                ? hostSessionController.CurrentSession
+                : SessionLifecycleUtility.TryGetAnyActiveSession();
             await SessionLifecycleUtility.TryDeleteSessionAsync(session);
 
             if (hostSessionController != null)
@@ -33,8 +35,9 @@ public class MainMenuHostDisbandLobbyButton : MonoBehaviour
             if (lobbyRelayManager != null)
                 lobbyRelayManager.StopLobbyHost();
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            Debug.LogException(exception);
         }
         finally
         {

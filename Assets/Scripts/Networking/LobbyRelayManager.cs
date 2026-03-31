@@ -9,6 +9,8 @@ public class LobbyRelayManager : MonoBehaviour
 {
     private const string GameplaySceneName = "Gameplay";
     private const string GameplayScenePath = "Scenes/Test Scenes/Gameplay";
+    private const string MainMenuSceneName = "Main Menu";
+    private const string MainMenuScenePath = "Assets/Scenes/Main Menu.unity";
 
     [SerializeField] private ushort port = 7788;
 
@@ -241,6 +243,54 @@ public class LobbyRelayManager : MonoBehaviour
         currentLobbyCode = string.Empty;
         hostIp = string.Empty;
         statusMessage = message;
+
+        LoadMainMenuScene();
+    }
+
+    private void LoadMainMenuScene()
+    {
+        var activeScene = SceneManager.GetActiveScene();
+        if (activeScene.name == MainMenuSceneName || activeScene.path.EndsWith("/Main Menu.unity"))
+        {
+            UnlockCursorForMainMenu();
+            return;
+        }
+
+        if (SceneUtility.GetBuildIndexByScenePath(MainMenuScenePath) >= 0)
+        {
+            PrepareNetworkManagerForMainMenuLoad();
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            SceneManager.sceneLoaded += OnSceneLoaded;
+            UnlockCursorForMainMenu();
+            SceneManager.LoadScene(MainMenuSceneName, LoadSceneMode.Single);
+            return;
+        }
+
+        Debug.LogWarning($"Main menu scene was not found in build settings at path '{MainMenuScenePath}'.");
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode loadSceneMode)
+    {
+        if (scene.name != MainMenuSceneName && !scene.path.EndsWith("/Main Menu.unity"))
+            return;
+
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        UnlockCursorForMainMenu();
+    }
+
+    private static void UnlockCursorForMainMenu()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
+    private static void PrepareNetworkManagerForMainMenuLoad()
+    {
+        var networkManager = NetworkManager.Singleton;
+        if (networkManager == null)
+            return;
+
+        UnityEngine.Object.Destroy(networkManager.gameObject);
     }
 
     private string GenerateLobbyCode()

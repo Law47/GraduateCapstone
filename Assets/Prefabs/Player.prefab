@@ -453,6 +453,10 @@ MonoBehaviour:
   bulletDamage: 10
   shootRange: 100
   firePoint: {fileID: 1368044536011108754}
+  headshotMultiplier: 2
+  magazineSize: 30
+  fireRate: 0.1
+  reloadTime: 2
   m_BulletTracer: {fileID: 0}
   m_TracerDuration: 0.1
 --- !u!1 &4319683968428068821
@@ -523,7 +527,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 327d066f07ae7cd4e8018ac92339253a, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -581,7 +585,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HeadHitboxDamage
   targetPlayerManager: {fileID: 3682589704372405225}
-  damageMultiplier: 2.5
 --- !u!1 &5783738965487470166
 GameObject:
   m_ObjectHideFlags: 0

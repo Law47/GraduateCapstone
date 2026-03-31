@@ -50,7 +50,9 @@ public class MainMenuClientLeaveLobbyButton : MonoBehaviour
 
             EnsureReferences();
 
-            var session = joinSessionController != null ? joinSessionController.CurrentSession : null;
+            var session = joinSessionController != null
+                ? joinSessionController.CurrentSession
+                : SessionLifecycleUtility.TryGetAnyActiveSession();
             await SessionLifecycleUtility.TryLeaveSessionAsync(session);
 
             if (joinSessionController != null)
@@ -59,8 +61,9 @@ public class MainMenuClientLeaveLobbyButton : MonoBehaviour
             if (lobbyRelayManager != null)
                 lobbyRelayManager.StopLobbyClient();
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            Debug.LogException(exception);
         }
         finally
         {
