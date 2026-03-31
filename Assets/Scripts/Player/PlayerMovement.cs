@@ -72,6 +72,12 @@ public class PlayerMovement : NetworkBehaviour
         {
             camera.enabled = IsOwner;
         }
+
+        if (IsOwner)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
     }
 
     void Update()

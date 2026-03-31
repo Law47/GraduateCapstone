@@ -49,6 +49,8 @@ public class MainMenuCreateSessionController : MonoBehaviour
             m_IsCreating = true;
 
             await MultiplayerServiceBootstrap.EnsureInitializedAndSignedInAsync();
+            await SessionLifecycleUtility.CleanupActiveSessionsAsync();
+            ClearLobbySessionState();
 
             var sessionName = string.IsNullOrWhiteSpace(m_SessionNameInput?.text)
                 ? fallbackSessionName
@@ -69,8 +71,9 @@ public class MainMenuCreateSessionController : MonoBehaviour
             m_LobbyRelayManager.SetCurrentLobbyCode(session.Code);
             m_LobbyRelayManager.StartHostWithLobby();
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            Debug.LogException(exception);
         }
         finally
         {
