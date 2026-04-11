@@ -13,6 +13,7 @@ public class PlayerManager : NetworkBehaviour
         NetworkVariableWritePermission.Server);
 
     private CharacterController m_CharacterController;
+    private ulong? m_LastDamageDealerClientId;
 
     public int CurrentHealth => m_CurrentHealth.Value;
     public int MaxHealth => maxHealth;
@@ -44,25 +45,30 @@ public class PlayerManager : NetworkBehaviour
 
     public void ApplyDamage(int damage)
     {
+        ApplyDamage(damage, ulong.MaxValue);
+    }
+
+    public void ApplyDamage(int damage, ulong attackerClientId)
+    {
         if (damage <= 0)
             return;
 
         if (IsServer)
         {
-            ApplyDamageInternal(damage);
+            ApplyDamageInternal(damage, attackerClientId);
             return;
         }
 
-        ApplyDamageServerRpc(damage);
+        ApplyDamageServerRpc(damage, attackerClientId);
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
-    private void ApplyDamageServerRpc(int damage)
+    private void ApplyDamageServerRpc(int damage, ulong attackerClientId)
     {
-        ApplyDamageInternal(damage);
+        ApplyDamageInternal(damage, attackerClientId);
     }
 
-    private void ApplyDamageInternal(int damage)
+    private void ApplyDamageInternal(int damage, ulong attackerClientId)
     {
         if (!IsServer)
             return;
@@ -70,11 +76,16 @@ public class PlayerManager : NetworkBehaviour
         if (m_CurrentHealth.Value <= 0)
             return;
 
+        if (attackerClientId != ulong.MaxValue && attackerClientId != OwnerClientId)
+        {
+            m_LastDamageDealerClientId = attackerClientId;
+        }
+
         m_CurrentHealth.Value = Mathf.Max(0, m_CurrentHealth.Value - damage);
 
         if (m_CurrentHealth.Value == 0)
         {
-            Die();
+            Die(m_LastDamageDealerClientId);
         }
     }
 
@@ -83,10 +94,15 @@ public class PlayerManager : NetworkBehaviour
         currentHealth = newValue;
     }
 
-    private void Die()
+    private void Die(ulong? killerClientId)
     {
         if (!IsServer)
             return;
+
+        if (killerClientId.HasValue)
+        {
+            AwardKillPointClientRpc(killerClientId.Value);
+        }
 
         var spawnManager = UnityEngine.Object.FindFirstObjectByType<GameSpawnManager>();
         var nextSpawnPosition = spawnManager != null ? spawnManager.GetRandomSpawnPosition() : transform.position;
@@ -95,6 +111,17 @@ public class PlayerManager : NetworkBehaviour
         RespawnClientRpc(nextSpawnPosition);
 
         m_CurrentHealth.Value = maxHealth;
+        m_LastDamageDealerClientId = null;
+    }
+
+    [ClientRpc]
+    private void AwardKillPointClientRpc(ulong killerClientId)
+    {
+        var gameManager = UnityEngine.Object.FindFirstObjectByType<GameManager>();
+        if (gameManager != null)
+        {
+            gameManager.OnPlayerKillByClientId(killerClientId);
+        }
     }
 
     [ClientRpc]

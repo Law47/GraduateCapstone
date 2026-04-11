@@ -184,7 +184,7 @@ public class PlayerActions : NetworkBehaviour
                     continue;
 
                 hitPoint = hit.point;
-                headHitbox.ApplyHitDamage(bulletDamage, headshotMultiplier);
+                headHitbox.ApplyHitDamage(bulletDamage, OwnerClientId, headshotMultiplier);
                 break;
             }
 
@@ -196,7 +196,7 @@ public class PlayerActions : NetworkBehaviour
             hitPoint = hit.point;
 
             if (targetPlayerManager != null)
-                targetPlayerManager.ApplyDamage(bulletDamage);
+                targetPlayerManager.ApplyDamage(bulletDamage, OwnerClientId);
 
             break;
         }
