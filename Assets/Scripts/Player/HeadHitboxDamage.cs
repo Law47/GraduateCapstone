@@ -6,12 +6,12 @@ public class HeadHitboxDamage : MonoBehaviour
 
     public PlayerManager TargetPlayerManager => targetPlayerManager;
 
-    public void ApplyHitDamage(int baseDamage, int multiplier = 2)
+    public void ApplyHitDamage(int baseDamage, ulong attackerClientId, int multiplier = 2)
     {
         if (targetPlayerManager == null)
             return;
 
         var finalDamage = Mathf.Max(1, baseDamage * multiplier);
-        targetPlayerManager.ApplyDamage(finalDamage);
+        targetPlayerManager.ApplyDamage(finalDamage, attackerClientId);
     }
 }

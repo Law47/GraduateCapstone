@@ -946,6 +946,54 @@ MonoBehaviour:
   joinCodePrefix: 'Join Code:'
   noJoinCodeText: 
   noPlayersText: 
+--- !u!1 &535290363
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 535290365}
+  - component: {fileID: 535290364}
+  m_Layer: 0
+  m_Name: ReturnToLobbyController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &535290364
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 535290363}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b027f43a35970b4685072a0b6bc0de0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MainMenuLobbyRoleMenuController
+  hostSessionMenu: {fileID: 1396762224}
+  joinedSessionMenu: {fileID: 1562043159}
+  defaultMenuWhenOffline: {fileID: 639884094}
+  runOnStart: 1
+--- !u!4 &535290365
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 535290363}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1799.4512, y: 0.00002, z: 4764.916}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &575781697
 GameObject:
   m_ObjectHideFlags: 0
@@ -4834,3 +4882,4 @@ SceneRoots:
   - {fileID: 330294553}
   - {fileID: 1776973859}
   - {fileID: 1360597448}
+  - {fileID: 535290365}
