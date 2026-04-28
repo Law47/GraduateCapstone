@@ -17,17 +17,19 @@ public class PlayerMovement : NetworkBehaviour
     [SerializeField] private float airDrag = 0.1f;
 
     [Header("Crouch & Slide")]
-    [SerializeField] private float moveThreshold = 3f;
+    [SerializeField] private float slideToCrouchSpeedThreshold = -1f;
     [SerializeField] private float crouchHeight = 1f;
     [SerializeField] private float crouchScale = 0.5f;
     [SerializeField] private float slideFriction = 0.1f;
     [SerializeField] private float crouchFriction = 5f;
     [SerializeField] private float slideSteeringMultiplier = 0.35f;
+    [SerializeField] private float slideDeceleration = 8f;
     [SerializeField] private float crouchCameraOffset = 0.5f;
     [SerializeField] private Transform crouchVisualTarget;
 
     [Header("Dash")]
-    [SerializeField] private float dashSpeed = 20f;
+    [SerializeField] private float dashDistance = 7f;
+    [SerializeField] private float dashDuration = 0.25f;
     [SerializeField] private float dashCooldown = 0.5f;
 
     [Header("Camera")]
@@ -51,6 +53,9 @@ public class PlayerMovement : NetworkBehaviour
     private Vector3 capsuleDefaultCenter;
     private float capsuleDefaultHeight;
     private float capsuleBottomOffset;
+    private bool isDashing;
+    private float dashTimer;
+    private Vector3 dashDirection;
 
     private enum MovementState { Normal, Crouch, Slide }
     private MovementState currentState = MovementState.Normal;
@@ -85,11 +90,17 @@ public class PlayerMovement : NetworkBehaviour
 
     void OnEnable()
     {
+        // Re-subscribe input when the component is re-enabled (e.g. after unpausing).
+        // IsSpawned guards against OnEnable firing before OnNetworkSpawn.
+        if (IsSpawned && IsOwner)
+            EnableOwnerInput();
     }
 
     void OnDisable()
     {
         crouchHeld = false;
+        isDashing = false;
+        dashTimer = 0f;
         DisableOwnerInput();
     }
 
@@ -185,6 +196,20 @@ public class PlayerMovement : NetworkBehaviour
 
     void HandleMovement()
     {
+        if (isDashing)
+        {
+            ApplyDashHorizontalVelocity();
+
+            dashTimer -= Time.fixedDeltaTime;
+            if (dashTimer <= 0f)
+            {
+                isDashing = false;
+                dashTimer = 0f;
+            }
+
+            return;
+        }
+
         Vector3 moveDirection = (transform.right * moveInput.x + transform.forward * moveInput.y).normalized;
 
         Vector3 horizontalVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
@@ -193,16 +218,18 @@ public class PlayerMovement : NetworkBehaviour
 
         if (currentState == MovementState.Slide)
         {
-            acceleration = slideAcceleration;
+            float currentSpeed = horizontalVelocity.magnitude;
+            float nextSpeed = Mathf.Max(0f, currentSpeed - (slideDeceleration * Time.fixedDeltaTime));
 
+            Vector3 slideDirection = currentSpeed > 0.01f ? horizontalVelocity.normalized : transform.forward;
             if (moveDirection.sqrMagnitude > 0.01f)
             {
-                targetVelocity = horizontalVelocity + (moveDirection * moveSpeed * slideSteeringMultiplier);
+                slideDirection = Vector3.Slerp(slideDirection, moveDirection, slideSteeringMultiplier);
+                slideDirection.Normalize();
             }
-            else
-            {
-                targetVelocity = horizontalVelocity;
-            }
+
+            targetVelocity = slideDirection * nextSpeed;
+            acceleration = slideAcceleration;
         }
 
         Vector3 nextHorizontalVelocity = Vector3.MoveTowards(horizontalVelocity, targetVelocity, acceleration * Time.fixedDeltaTime);
@@ -223,6 +250,12 @@ public class PlayerMovement : NetworkBehaviour
 
     void ApplyDrag()
     {
+        if (isDashing)
+        {
+            rb.linearDamping = 0f;
+            return;
+        }
+
         float currentDrag = groundDrag;
         
         if (!isGrounded)
@@ -245,10 +278,11 @@ public class PlayerMovement : NetworkBehaviour
     {
         MovementState newState = MovementState.Normal;
         float horizontalSpeed = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z).magnitude;
+        float crouchThreshold = slideToCrouchSpeedThreshold > 0f ? slideToCrouchSpeedThreshold : moveSpeed;
 
         if (crouchHeld)
         {
-            newState = horizontalSpeed >= moveThreshold ? MovementState.Slide : MovementState.Crouch;
+            newState = horizontalSpeed >= crouchThreshold ? MovementState.Slide : MovementState.Crouch;
         }
 
         if (currentState != newState)
@@ -281,19 +315,33 @@ public class PlayerMovement : NetworkBehaviour
     void Dash()
     {
         if (!IsOwner || rb.isKinematic) return;
+        if (isDashing) return;
         if (dashCooldownTimer > 0) return;
         if (moveInput == Vector2.zero) return;
 
-        Vector3 inputDirection = (transform.right * moveInput.x + transform.forward * moveInput.y).normalized;
-
-        Vector3 horizontalVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-        Vector3 boostedVelocity = horizontalVelocity + (inputDirection * dashSpeed);
-        rb.linearVelocity = new Vector3(boostedVelocity.x, rb.linearVelocity.y, boostedVelocity.z);
+        dashDirection = (transform.right * moveInput.x + transform.forward * moveInput.y).normalized;
+        dashTimer = Mathf.Max(0.01f, dashDuration);
+        isDashing = true;
+        ApplyDashHorizontalVelocity();
         dashCooldownTimer = dashCooldown;
+    }
+
+    void ApplyDashHorizontalVelocity()
+    {
+        float dashSpeed = dashDistance / Mathf.Max(0.01f, dashDuration);
+        rb.linearVelocity = new Vector3(dashDirection.x * dashSpeed, rb.linearVelocity.y, dashDirection.z * dashSpeed);
     }
 
     void EnableOwnerInput()
     {
+        // Unsubscribe first to prevent double-subscription if called more than once.
+        inputActions.Player.Move.performed -= OnMovePerformed;
+        inputActions.Player.Move.canceled -= OnMoveCanceled;
+        inputActions.Player.Look.performed -= OnLookPerformed;
+        inputActions.Player.Look.canceled -= OnLookCanceled;
+        inputActions.Player.Jump.performed -= OnJumpPerformed;
+        inputActions.Player.Dash.performed -= OnDashPerformed;
+
         inputActions.Player.Move.performed += OnMovePerformed;
         inputActions.Player.Move.canceled += OnMoveCanceled;
         inputActions.Player.Look.performed += OnLookPerformed;
@@ -364,5 +412,52 @@ public class PlayerMovement : NetworkBehaviour
     {
         currentState = newState;
         ApplyStance(newState);
+    }
+
+    /// <summary>
+    /// Called on the owner client when the player dies or respawns.
+    /// On death: detaches the camera (it lingers at the kill position) and freezes physics/input.
+    /// On respawn: teleports the player, re-attaches the camera, and restores control.
+    /// No-op on non-owner clients.
+    /// </summary>
+    public void SetDeadStateOnOwner(bool isDead, Vector3 respawnPosition = default)
+    {
+        if (!IsOwner)
+            return;
+
+        if (isDead)
+        {
+            DisableOwnerInput();
+            rb.linearVelocity = Vector3.zero;
+            rb.isKinematic = true;
+
+            // Detach the camera so it stays at the world-space death position.
+            if (playerCamera != null)
+                playerCamera.transform.SetParent(null, worldPositionStays: true);
+        }
+        else
+        {
+            // Move the Rigidbody to the spawn point before re-attaching the camera.
+            rb.position = respawnPosition;
+            transform.position = respawnPosition;
+
+            // Re-attach the camera. worldPositionStays:true keeps it at its current
+            // world position momentarily; we then immediately snap the local position
+            // to the default offset so no interpolation frame is visible.
+            if (playerCamera != null)
+            {
+                playerCamera.transform.SetParent(transform, worldPositionStays: true);
+                playerCamera.transform.localRotation = Quaternion.identity;
+                xRotation = 0f;
+            }
+
+            // Reset stance \u2014 this sets the correct capsule size AND camera local position.
+            currentState = MovementState.Normal;
+            ApplyStance(MovementState.Normal);
+
+            rb.isKinematic = false;
+            rb.linearVelocity = Vector3.zero;
+            EnableOwnerInput();
+        }
     }
 }

@@ -14,6 +14,19 @@ namespace Blocks.Sessions.Common
 
         public static event Action GameplayStartRequested;
 
+        /// <summary>
+        /// Set by LobbyRelayManager (which references NGO) so this assembly
+        /// does not need a direct dependency on Unity.Netcode.
+        /// Returns the current number of fully-connected NGO clients.
+        /// </summary>
+        public static Func<int> GetNgoConnectedClientCount;
+
+        /// <summary>
+        /// Raised by LobbyRelayManager whenever the NGO connected-client count
+        /// changes (client connected or disconnected). Triggers a button refresh.
+        /// </summary>
+        public static Action NgoConnectedClientsChanged;
+
         private SessionObserver m_SessionObserver;
         private ISession m_Session;
 
@@ -49,6 +62,10 @@ namespace Blocks.Sessions.Common
             {
                 UnityEngine.Debug.Log("[PlayGameViewModel] Waiting for session to be added");
             }
+
+            // Re-evaluate the button whenever NGO signals a connection change.
+            NgoConnectedClientsChanged += UpdateCanPlayGame;
+
             UpdateCanPlayGame();
         }
 
@@ -96,12 +113,21 @@ namespace Blocks.Sessions.Common
                 return;
             }
 
-            int playerCount = m_Session.Players.Count;
+            int sessionPlayerCount = m_Session.Players.Count;
             bool isHost = m_Session.IsHost;
-            UnityEngine.Debug.Log($"[PlayGameViewModel] Player count: {playerCount}, IsHost: {isHost}");
+
+            // Use the NGO count supplied by LobbyRelayManager. If the hook is not
+            // set yet (e.g. offline/editor), assume all session players are connected.
+            int ngoConnectedCount = GetNgoConnectedClientCount != null
+                ? GetNgoConnectedClientCount()
+                : sessionPlayerCount;
+
+            bool allNgoConnected = ngoConnectedCount >= sessionPlayerCount;
+
+            UnityEngine.Debug.Log($"[PlayGameViewModel] Session players: {sessionPlayerCount}, NGO connected: {ngoConnectedCount}, IsHost: {isHost}");
 
             // Only the session host should be able to trigger a synchronized scene transition.
-            CanPlayGame = playerCount >= 2 && isHost;
+            CanPlayGame = sessionPlayerCount >= 2 && isHost && allNgoConnected;
         }
 
         public void PlayGame()
@@ -125,6 +151,11 @@ namespace Blocks.Sessions.Common
             SceneManager.LoadScene(k_GameplayScenePath, LoadSceneMode.Single);
         }
 
+        void OnNgoClientConnectionChanged(ulong clientId)
+        {
+            UpdateCanPlayGame();
+        }
+
         void CleanupSession()
         {
             if (m_Session == null)
@@ -142,6 +173,8 @@ namespace Blocks.Sessions.Common
 
         public void Dispose()
         {
+            NgoConnectedClientsChanged -= UpdateCanPlayGame;
+
             if (m_SessionObserver != null)
             {
                 m_SessionObserver.Dispose();

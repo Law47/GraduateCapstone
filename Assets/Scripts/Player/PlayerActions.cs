@@ -227,4 +227,20 @@ public class PlayerActions : NetworkBehaviour
         if (m_BulletTracer != null)
             m_BulletTracer.enabled = false;
     }
+
+    /// <summary>
+    /// Immediately cancels any pending tracer coroutine and hides the line.
+    /// Safe to call from any client (no-op if the tracer is already hidden).
+    /// </summary>
+    public void CancelTracer()
+    {
+        if (m_TracerCoroutine != null)
+        {
+            StopCoroutine(m_TracerCoroutine);
+            m_TracerCoroutine = null;
+        }
+
+        if (m_BulletTracer != null)
+            m_BulletTracer.enabled = false;
+    }
 }
