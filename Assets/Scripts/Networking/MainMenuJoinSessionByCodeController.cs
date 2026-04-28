@@ -73,7 +73,7 @@ public class MainMenuJoinSessionByCodeController : MonoBehaviour
 
             EnsureLobbyRelayManager();
             m_LobbyRelayManager.SetCurrentLobbyCode(code);
-            m_LobbyRelayManager.StartClientWithLobby(hostIpForDirectConnect, code);
+            await m_LobbyRelayManager.StartClientWithLobbyAsync(joinedSession);
         }
         catch (Exception exception)
         {

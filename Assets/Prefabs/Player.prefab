@@ -276,15 +276,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
   moveSpeed: 5
+  groundAcceleration: 50
+  airAcceleration: 15
+  slideAcceleration: 12
   jumpHeight: 2
   gravity: -9.81
+  groundedSnapVelocity: 2
   groundDrag: 5
   airDrag: 0.1
-  moveThreshold: 3
+  slideToCrouchSpeedThreshold: -1
+  crouchHeight: 0.5
   crouchScale: 0.5
   slideFriction: 0.1
   crouchFriction: 5
-  dashSpeed: 50
+  slideSteeringMultiplier: 0.35
+  slideDeceleration: 8
+  crouchCameraOffset: 0.5
+  crouchVisualTarget: {fileID: 0}
+  dashDistance: 3
   dashDuration: 0.15
   dashCooldown: 0.5
   playerCamera: {fileID: 2856484651483049875}

@@ -67,9 +67,8 @@ public class MainMenuCreateSessionController : MonoBehaviour
             SetSession(session);
 
             EnsureLobbyRelayManager();
-            m_LobbyRelayManager.SetHostIp(directConnectHostIp);
             m_LobbyRelayManager.SetCurrentLobbyCode(session.Code);
-            m_LobbyRelayManager.StartHostWithLobby();
+            await m_LobbyRelayManager.StartHostWithLobbyAsync(session);
         }
         catch (Exception exception)
         {

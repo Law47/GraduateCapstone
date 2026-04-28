@@ -26,9 +26,14 @@ public class GameManager : MonoBehaviour
 
     private Dictionary<string, int> playerScores = new Dictionary<string, int>();
     private bool gameOver = false;
+    private bool m_IsReturningToMainMenu;
 
     void Start()
     {
+        // Lock cursor for gameplay on every client, including after a scene restart.
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
         // Initialize the game
         if (winMenuPanel != null)
             winMenuPanel.SetActive(false);
@@ -59,31 +64,6 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Call this when a player gets a kill. Adds 1 point to the killer.
-    /// </summary>
-    /// <param name="playerName">The name/ID of the player who got the kill</param>
-    public void OnPlayerKill(string playerName)
-    {
-        if (gameOver)
-            return;
-
-        // Add or update player score
-        if (!playerScores.ContainsKey(playerName))
-        {
-            playerScores[playerName] = 0;
-        }
-
-        playerScores[playerName]++;
-        RefreshGameplayScoreboard();
-
-        // Check if player has reached win condition
-        if (playerScores[playerName] >= pointsToWin)
-        {
-            EndGame(playerName, null);
-        }
-    }
-
-    /// <summary>
     /// Call this when a player gets a kill and only a clientId is known.
     /// </summary>
     public void OnPlayerKillByClientId(ulong killerClientId)
@@ -106,11 +86,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Call this to register a new player in the game (initialize their score to 0)
-    /// </summary>
-    /// <param name="playerName">The name/ID of the player</param>
-    public void RegisterPlayer(string playerName)
+    private void RegisterPlayer(string playerName)
     {
         if (!playerScores.ContainsKey(playerName))
         {
@@ -143,6 +119,16 @@ public class GameManager : MonoBehaviour
 
     private void OnClientDisconnected(ulong clientId)
     {
+        var networkManager = NetworkManager.Singleton;
+        bool isLocalDisconnect = networkManager != null && clientId == networkManager.LocalClientId;
+        bool isClientOnly = networkManager != null && networkManager.IsClient && !networkManager.IsHost && !networkManager.IsServer;
+
+        if (isLocalDisconnect && isClientOnly)
+        {
+            ReturnLocalPlayerToMainMenu();
+            return;
+        }
+
         string playerName = GetDisplayNameForClientId(clientId);
         if (playerScores.Remove(playerName))
         {
@@ -155,7 +141,7 @@ public class GameManager : MonoBehaviour
         return $"Player {clientId}";
     }
 
-    private void EndGame(string winnerName, ulong? winnerClientId)
+    private void EndGame(string winnerName, ulong winnerClientId)
     {
         gameOver = true;
 
@@ -164,11 +150,8 @@ public class GameManager : MonoBehaviour
 
         UpdateHostOnlyControls();
 
-        bool localPlayerWon = !winnerClientId.HasValue;
-        if (winnerClientId.HasValue && NetworkManager.Singleton != null)
-        {
-            localPlayerWon = NetworkManager.Singleton.LocalClientId == winnerClientId.Value;
-        }
+        bool localPlayerWon = NetworkManager.Singleton != null &&
+                              NetworkManager.Singleton.LocalClientId == winnerClientId;
 
         // Winner sees win menu, everyone else sees lose menu.
         if (winMenuPanel != null)
@@ -269,8 +252,18 @@ public class GameManager : MonoBehaviour
 
         RefreshGameplayScoreboard();
 
-        // Reload the current scene to reset gameplay
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        // Use LobbyRelayManager so NGO's scene manager drives the load and
+        // OnLoadEventCompleted fires — which is what triggers player spawning.
+        var lobbyRelayManager = UnityEngine.Object.FindFirstObjectByType<LobbyRelayManager>();
+        if (lobbyRelayManager != null)
+        {
+            lobbyRelayManager.RestartGameplay();
+        }
+        else
+        {
+            // Offline / editor fallback only.
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        }
     }
 
     /// <summary>
@@ -279,9 +272,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void ReturnToLobby()
     {
-        if (NetworkManager.Singleton != null &&
-            NetworkManager.Singleton.IsListening &&
-            NetworkManager.Singleton.NetworkConfig.EnableSceneManagement)
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
         {
             if (!NetworkManager.Singleton.IsHost && !NetworkManager.Singleton.IsServer)
             {
@@ -289,13 +280,63 @@ public class GameManager : MonoBehaviour
                 return;
             }
 
-            var loadStatus = NetworkManager.Singleton.SceneManager.LoadScene(mainMenuSceneName, LoadSceneMode.Single);
-            Debug.Log($"Return to lobby scene load requested. Status: {loadStatus}");
+            m_IsReturningToMainMenu = true;
+            DespawnAllPlayersOnServer();
+
+            // End the network session entirely, clients will return to menu via disconnect callback.
+            NetworkManager.Singleton.Shutdown();
+            LoadMainMenuLocally();
+            m_IsReturningToMainMenu = false;
         }
         else
         {
             // Fallback for local/offline mode.
             SceneManager.LoadScene(mainMenuSceneName, LoadSceneMode.Single);
+        }
+    }
+
+    private void ReturnLocalPlayerToMainMenu()
+    {
+        if (m_IsReturningToMainMenu)
+            return;
+
+        m_IsReturningToMainMenu = true;
+        LoadMainMenuLocally();
+        m_IsReturningToMainMenu = false;
+    }
+
+    private void LoadMainMenuLocally()
+    {
+        UnlockCursorForMenu();
+        SceneManager.LoadScene(mainMenuSceneName, LoadSceneMode.Single);
+    }
+
+    private static void DespawnAllPlayersOnServer()
+    {
+        var networkManager = NetworkManager.Singleton;
+        if (networkManager == null || !networkManager.IsServer)
+            return;
+
+        var spawnedObjects = networkManager.SpawnManager.SpawnedObjectsList;
+        if (spawnedObjects == null || spawnedObjects.Count == 0)
+            return;
+
+        // Copy first to avoid modifying collection while iterating.
+        var toDespawn = new List<NetworkObject>(spawnedObjects.Count);
+        foreach (var networkObject in spawnedObjects)
+        {
+            if (networkObject == null || !networkObject.IsSpawned)
+                continue;
+
+            if (networkObject.GetComponent<PlayerManager>() != null)
+            {
+                toDespawn.Add(networkObject);
+            }
+        }
+
+        foreach (var networkObject in toDespawn)
+        {
+            networkObject.Despawn(true);
         }
     }
 }

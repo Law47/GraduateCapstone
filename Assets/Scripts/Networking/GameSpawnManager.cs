@@ -6,28 +6,37 @@ public class GameSpawnManager : MonoBehaviour
 {
     [SerializeField] private Transform[] spawnPoints;
     [SerializeField] private GameObject playerPrefab;
-    
-    private bool m_AutoSpawnOnStart = true;
 
-    private void Start()
+    // Called by LobbyRelayManager after all clients have confirmed the gameplay
+    // scene has loaded (subscribed before LoadScene so the event is never missed).
+    public void SpawnPlayersForClients(List<ulong> clientIds)
     {
-        if (!NetworkManager.Singleton.IsHost && !NetworkManager.Singleton.IsServer)
-            return;
-        
-        if (m_AutoSpawnOnStart)
+        if (playerPrefab == null)
         {
-            SpawnAllPlayers();
+            Debug.LogError("[GameSpawnManager] playerPrefab is not assigned.");
+            return;
         }
-    }
 
-    public void SetAutoSpawnOnStart(bool autoSpawn)
-    {
-        m_AutoSpawnOnStart = autoSpawn;
-    }
+        var availableSpawnPoints = BuildAvailableSpawnPoints();
 
-    public void SpawnAllPlayers()
-    {
-        SpawnAllPlayersAtRandomLocations();
+        foreach (var clientId in clientIds)
+        {
+            // Guard against double-spawning (e.g. on respawn).
+            if (NetworkManager.Singleton.SpawnManager.GetPlayerNetworkObject(clientId) != null)
+                continue;
+
+            Vector3 spawnPos = GetNextSpawnPosition(availableSpawnPoints);
+            var playerInstance = Instantiate(playerPrefab, spawnPos, Quaternion.identity);
+            var networkObject = playerInstance.GetComponent<NetworkObject>();
+            if (networkObject == null)
+            {
+                Debug.LogError("[GameSpawnManager] playerPrefab does not have a NetworkObject component.");
+                Destroy(playerInstance);
+                continue;
+            }
+
+            networkObject.SpawnAsPlayerObject(clientId);
+        }
     }
 
     public GameObject SpawnSingleplayerPlayer()
@@ -44,59 +53,39 @@ public class GameSpawnManager : MonoBehaviour
         if (spawnPoints == null || spawnPoints.Length == 0)
             return transform.position;
 
-        var spawnPointIndex = Random.Range(0, spawnPoints.Length);
-        return spawnPoints[spawnPointIndex].position;
+        return spawnPoints[Random.Range(0, spawnPoints.Length)].position;
     }
 
-    private void SpawnAllPlayersAtRandomLocations()
+    private List<int> BuildAvailableSpawnPoints()
     {
-        var connectedClients = NetworkManager.Singleton.ConnectedClients;
-
-        if (spawnPoints == null || spawnPoints.Length == 0)
+        var list = new List<int>();
+        if (spawnPoints != null)
         {
-            Debug.LogWarning("Warning: no spawnpoints configured. Spawning players at GameSpawnManager position.");
-
-            foreach (var client in connectedClients.Values)
-            {
-                var fallbackInstance = Instantiate(playerPrefab, transform.position, Quaternion.identity);
-                var fallbackNetworkObject = fallbackInstance.GetComponent<NetworkObject>();
-                fallbackNetworkObject.SpawnAsPlayerObject(client.ClientId);
-            }
-
-            return;
+            for (int i = 0; i < spawnPoints.Length; i++)
+                list.Add(i);
         }
+        return list;
+    }
 
-        if (connectedClients.Count > spawnPoints.Length)
+    private Vector3 GetNextSpawnPosition(List<int> available)
+    {
+        if (available.Count == 0)
         {
-            Debug.LogWarning("Warning: more players than spawnpoints");
-        }
-
-        var availableSpawnPoints = new List<int>();
-
-        for (int i = 0; i < spawnPoints.Length; i++)
-        {
-            availableSpawnPoints.Add(i);
-        }
-
-        foreach (var client in connectedClients.Values)
-        {
-            if (availableSpawnPoints.Count == 0)
+            // Refill if we've run out (more players than spawn points).
+            if (spawnPoints != null && spawnPoints.Length > 0)
             {
                 for (int i = 0; i < spawnPoints.Length; i++)
-                {
-                    availableSpawnPoints.Add(i);
-                }
+                    available.Add(i);
             }
-
-            int randomIndex = Random.Range(0, availableSpawnPoints.Count);
-            int spawnPointIndex = availableSpawnPoints[randomIndex];
-            availableSpawnPoints.RemoveAt(randomIndex);
-
-            Vector3 spawnPos = spawnPoints[spawnPointIndex].position;
-            var playerInstance = Instantiate(playerPrefab, spawnPos, Quaternion.identity);
-            
-            var networkObject = playerInstance.GetComponent<NetworkObject>();
-            networkObject.SpawnAsPlayerObject(client.ClientId);
+            else
+            {
+                return transform.position;
+            }
         }
+
+        int randomIndex = Random.Range(0, available.Count);
+        int spawnPointIndex = available[randomIndex];
+        available.RemoveAt(randomIndex);
+        return spawnPoints[spawnPointIndex].position;
     }
 }
